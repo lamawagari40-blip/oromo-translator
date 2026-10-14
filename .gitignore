@@ -1,3 +1,17 @@
 __pycache__/
 *.pyc
 artifacts/
+1_data/
+2_tokenize/
+3_train/
+4_evaluate/
+5_serve/
+6_ui/
+core/
+notebooks/
+tests/
+render_app/
+.gradio/
+app.py
+hf_app.py
+hf_requirements.txt
