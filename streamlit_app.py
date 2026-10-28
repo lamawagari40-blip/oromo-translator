@@ -8,6 +8,15 @@ from huggingface_hub import hf_hub_download
 
 st.set_page_config(page_title="Saiko", page_icon="🌳", layout="centered")
 
+st.markdown('''
+    <head>
+        <meta name="apple-mobile-web-app-title" content="Saiko">
+        <meta name="application-name" content="Saiko">
+        <title>Saiko</title>
+    </head>
+''', unsafe_allow_html=True)
+
+
 
 st.markdown('''
     <style>
