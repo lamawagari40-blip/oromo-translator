@@ -144,21 +144,47 @@ def translate(model, vocab, sentence, tgt_lang="am"):
         hidden = hidden.unsqueeze(0).repeat(2, 1, 1)
         cell = torch.zeros_like(hidden).to(device)
         
-        trg_indexes = [vocab.word2id["<sos>"]]
-        for i in range(20):
-            trg_tensor = torch.tensor([trg_indexes[-1]]).to(device)
-            output, hidden, cell = model.decoder(trg_tensor, hidden, cell, encoder_outputs)
-            
-            for prev_word in set(trg_indexes):
-                output[0, prev_word] -= 2.0
+        # BEAM SEARCH IMPLEMENTATION
+        k = 3 # Beam width (looks at top 3 paths)
+        max_len = 20
+        
+        # Beam contains tuples of (log_probability, sequence, hidden, cell)
+        beam = [(0.0, [vocab.word2id["<sos>"]], hidden, cell)]
+        
+        for _ in range(max_len):
+            candidates = []
+            for score, seq, h, c in beam:
+                # If the sequence already ended, keep it
+                if seq[-1] == vocab.word2id["<eos>"]:
+                    candidates.append((score, seq, h, c))
+                    continue
                 
-            pred_token = output.argmax(1).item()
-            trg_indexes.append(pred_token)
-            if pred_token == vocab.word2id["<eos>"]:
+                trg_tensor = torch.tensor([seq[-1]]).to(device)
+                output, new_h, new_c = model.decoder(trg_tensor, h, c, encoder_outputs)
+                
+                # Get top k tokens
+                log_probs = F.log_softmax(output, dim=1)
+                topk_scores, topk_ids = log_probs.topk(k, dim=1)
+                
+                for i in range(k):
+                    token = topk_ids[0][i].item()
+                    new_score = score + topk_scores[0][i].item()
+                    new_seq = seq + [token]
+                    candidates.append((new_score, new_seq, new_h, new_c))
+            
+            # Sort candidates by score and keep the top k
+            candidates.sort(key=lambda x: x[0], reverse=True)
+            beam = candidates[:k]
+            
+            # If all top k sequences ended with <eos>, stop
+            if all(seq[-1] == vocab.word2id["<eos>"] for _, seq, _, _ in beam):
                 break
                 
+        # Pick the best sequence
+        best_seq = beam[0][1]
+        
     words = []
-    for i in trg_indexes[1:]:
+    for i in best_seq[1:]:
         if i == vocab.word2id["<eos>"]: break
         if i in [vocab.word2id["<sos>"], vocab.word2id["<pad>"]]: continue
         
