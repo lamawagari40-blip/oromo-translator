@@ -8,6 +8,27 @@ from huggingface_hub import hf_hub_download
 
 st.set_page_config(page_title="Saiko", page_icon="🌳", layout="centered")
 
+
+st.markdown('''
+    <style>
+    /* Hide Streamlit Header and Footer */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Force the main background color */
+    .stApp {
+        background-color: #0E1117 !important;
+    }
+    
+    /* Remove the top padding so Saiko is higher up */
+    .block-container {
+        padding-top: 2rem !important;
+    }
+    </style>
+''', unsafe_allow_html=True)
+
+
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
