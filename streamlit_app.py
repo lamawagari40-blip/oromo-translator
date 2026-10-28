@@ -161,7 +161,12 @@ def translate(model, vocab, sentence, tgt_lang="am"):
     for i in trg_indexes[1:]:
         if i == vocab.word2id["<eos>"]: break
         if i in [vocab.word2id["<sos>"], vocab.word2id["<pad>"]]: continue
-        words.append(vocab.id2word.get(i, "<unk>"))
+        
+        # Clean up the output for the user
+        word = vocab.id2word.get(i, "")
+        if word in ["<2am>", "<2om>", "<unk>"]: continue
+        words.append(word)
+        
     return " ".join(words)
 
 try:
