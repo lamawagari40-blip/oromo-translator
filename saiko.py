@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pickle
+from huggingface_hub import hf_hub_download
 
 st.set_page_config(page_title="Saiko", page_icon="🌳", layout="centered")
 
@@ -114,9 +115,12 @@ class Seq2Seq(nn.Module):
         self.decoder = decoder
         self.device = device
 
-@st.cache_resource(show_spinner="Loading Saiko AI...")
+@st.cache_resource(show_spinner="Loading Saiko AI from Hugging Face...")
 def load_model():
-    with open("vocab.pkl", "rb") as f:
+    vocab_path = hf_hub_download(repo_id="lwagari/saiko-lstm-model", filename="vocab.pkl")
+    model_path = hf_hub_download(repo_id="lwagari/saiko-lstm-model", filename="lstm_focus.pt")
+
+    with open(vocab_path, "rb") as f:
         vocab = pickle.load(f)
     
     INPUT_DIM = OUTPUT_DIM = len(vocab.word2id)
@@ -125,7 +129,7 @@ def load_model():
     dec = Decoder(OUTPUT_DIM, 256, 256, 256, 0.1, attn)
     model = Seq2Seq(enc, dec, device).to(device)
     
-    model.load_state_dict(torch.load("lstm_focus.pt", map_location=device))
+    model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
     return model, vocab
 
