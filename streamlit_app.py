@@ -155,8 +155,8 @@ class Seq2Seq(nn.Module):
 
 @st.cache_resource(show_spinner="Loading Saiko AI from Hugging Face...")
 def load_model():
-    vocab_path = hf_hub_download(repo_id="lwagari/saiko-lstm-model", filename="vocab.pkl")
-    model_path = hf_hub_download(repo_id="lwagari/saiko-lstm-model", filename="lstm_focus.pt")
+    vocab_path = hf_hub_download(repo_id="lwagari/saiko-lstm-model", filename="vocab_trilingual.pkl")
+    model_path = hf_hub_download(repo_id="lwagari/saiko-lstm-model", filename="lstm_trilingual.pt")
 
     with open(vocab_path, "rb") as f:
         vocab = pickle.load(f)
