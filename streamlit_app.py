@@ -9,45 +9,13 @@ from huggingface_hub import hf_hub_download
 st.set_page_config(page_title="Saiko", page_icon="🌳", layout="centered")
 
 st.markdown('''
-    <head>
-        <meta name="apple-mobile-web-app-title" content="Saiko">
-        <meta name="application-name" content="Saiko">
-        <title>Saiko</title>
-    </head>
-''', unsafe_allow_html=True)
-
-
-
-st.markdown('''
-    <style>
-    /* Hide Streamlit Header and Footer */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    
-    /* Force the main background color */
-    .stApp {
-        background-color: #0E1117 !important;
-    }
-    
-    /* Remove the top padding so Saiko is higher up */
-    .block-container {
-        padding-top: 2rem !important;
-    }
-    </style>
-''', unsafe_allow_html=True)
-
-
-st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    </style>
-""", unsafe_allow_html=True)
-
-st.markdown('''
-    <style>
+    .stApp { background-color: #0E1117 !important; }
+    .block-container { padding-top: 2rem !important; }
+    
     .title-text {
         font-size: 3.5rem !important;
         font-weight: 900 !important;
@@ -124,8 +92,7 @@ class Attention(nn.Module):
         batch_size, src_len = encoder_outputs.shape[0], encoder_outputs.shape[1]
         hidden = hidden.unsqueeze(1).repeat(1, src_len, 1)
         energy = torch.tanh(self.attn(torch.cat((hidden, encoder_outputs), dim=2)))
-        attention = self.v(energy).squeeze(2)
-        return F.softmax(attention, dim=1)
+        return F.softmax(self.v(energy).squeeze(2), dim=1)
 
 class Decoder(nn.Module):
     def __init__(self, output_dim, emb_dim, enc_hid_dim, dec_hid_dim, dropout, attention):
@@ -182,53 +149,26 @@ def translate(model, vocab, sentence, tgt_lang="am"):
         hidden = hidden.unsqueeze(0).repeat(2, 1, 1)
         cell = torch.zeros_like(hidden).to(device)
         
-        # BEAM SEARCH IMPLEMENTATION
-        k = 3 # Beam width (looks at top 3 paths)
-        max_len = 20
-        
-        # Beam contains tuples of (log_probability, sequence, hidden, cell)
-        beam = [(0.0, [vocab.word2id["<sos>"]], hidden, cell)]
-        
-        for _ in range(max_len):
-            candidates = []
-            for score, seq, h, c in beam:
-                # If the sequence already ended, keep it
-                if seq[-1] == vocab.word2id["<eos>"]:
-                    candidates.append((score, seq, h, c))
-                    continue
-                
-                trg_tensor = torch.tensor([seq[-1]]).to(device)
-                output, new_h, new_c = model.decoder(trg_tensor, h, c, encoder_outputs)
-                
-                # Get top k tokens
-                log_probs = F.log_softmax(output, dim=1)
-                topk_scores, topk_ids = log_probs.topk(k, dim=1)
-                
-                for i in range(k):
-                    token = topk_ids[0][i].item()
-                    new_score = score + topk_scores[0][i].item()
-                    new_seq = seq + [token]
-                    candidates.append((new_score, new_seq, new_h, new_c))
+        trg_indexes = [vocab.word2id["<sos>"]]
+        for i in range(20):
+            trg_tensor = torch.tensor([trg_indexes[-1]]).to(device)
+            output, hidden, cell = model.decoder(trg_tensor, hidden, cell, encoder_outputs)
             
-            # Sort candidates by score and keep the top k
-            candidates.sort(key=lambda x: x[0], reverse=True)
-            beam = candidates[:k]
-            
-            # If all top k sequences ended with <eos>, stop
-            if all(seq[-1] == vocab.word2id["<eos>"] for _, seq, _, _ in beam):
+            for prev_word in set(trg_indexes):
+                output[0, prev_word] -= 2.0
+                
+            pred_token = output.argmax(1).item()
+            trg_indexes.append(pred_token)
+            if pred_token == vocab.word2id["<eos>"]:
                 break
                 
-        # Pick the best sequence
-        best_seq = beam[0][1]
-        
     words = []
-    for i in best_seq[1:]:
+    for i in trg_indexes[1:]:
         if i == vocab.word2id["<eos>"]: break
         if i in [vocab.word2id["<sos>"], vocab.word2id["<pad>"]]: continue
         
-        # Clean up the output for the user
         word = vocab.id2word.get(i, "")
-        if word in ["<2am>", "<2om>", "<unk>"]: continue
+        if word in ["<2am>", "<2om>", "<2en>", "<unk>"]: continue
         words.append(word)
         
     return " ".join(words)
@@ -236,7 +176,7 @@ def translate(model, vocab, sentence, tgt_lang="am"):
 try:
     model, vocab = load_model()
 except Exception as e:
-    st.error(f"Model loading failed. Ensure vocab.pkl and lstm_focus.pt are in the repo. Error: {e}")
+    st.error(f"Model loading failed. Error: {e}")
 
 LANG_NAME = {"om": "Afaan Oromoo", "am": "አማርኛ", "en": "English"}
 
