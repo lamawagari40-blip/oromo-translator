@@ -180,12 +180,12 @@ def translate(model, vocab, sentence, tgt_lang="am"):
     # If the output is just English stop words, return a fallback message
     stop_words = ["and", "the", "a", "of", "to", "in", "is", "that"]
     if all(w.lower() in stop_words or w in [",", "."] for w in words) and len(words) < 5:
-        return "[Model is still training: Please try again later]"
+        return "[Model is still training: Please try again later]", 0.0
         
     # Clean up spacing around punctuation
     import re
     result = re.sub(r'\s+([,.!?])', r'\1', result)
-    return result
+    return result, confidence
 
 try:
     model, vocab = load_model()
