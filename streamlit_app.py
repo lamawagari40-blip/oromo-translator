@@ -172,7 +172,17 @@ def translate(model, vocab, sentence, tgt_lang="am"):
         if word in ["<2am>", "<2om>", "<2en>", "<unk>"]: continue
         words.append(word)
         
-    return " ".join(words)
+    result = " ".join(words)
+    
+    # If the output is just English stop words, return a fallback message
+    stop_words = ["and", "the", "a", "of", "to", "in", "is", "that"]
+    if all(w.lower() in stop_words or w in [",", "."] for w in words) and len(words) < 5:
+        return "[Model is still training: Please try again later]"
+        
+    # Clean up spacing around punctuation
+    import re
+    result = re.sub(r'\s+([,.!?])', r'\1', result)
+    return result
 
 try:
     model, vocab = load_model()
