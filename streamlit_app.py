@@ -150,14 +150,17 @@ def translate(model, vocab, sentence, tgt_lang="am"):
         cell = torch.zeros_like(hidden).to(device)
         
         trg_indexes = [vocab.word2id["<sos>"]]
+        probs = []
         for i in range(20):
             trg_tensor = torch.tensor([trg_indexes[-1]]).to(device)
             output, hidden, cell = model.decoder(trg_tensor, hidden, cell, encoder_outputs)
             
             for prev_word in set(trg_indexes):
                 output[0, prev_word] -= 2.0
-                
+            
+            prob_dist = F.softmax(output, dim=1)
             pred_token = output.argmax(1).item()
+            probs.append(prob_dist[0, pred_token].item())
             trg_indexes.append(pred_token)
             
             if pred_token == vocab.word2id["<eos>"] and i > 3:
@@ -207,7 +210,8 @@ if st.button("Translate 🚀"):
     else:
         with st.spinner("Saiko is translating..."):
             try:
-                result = translate(model, vocab, text, tgt_lang=tgt)
+                result, confidence = translate(model, vocab, text, tgt_lang=tgt)
                 st.success(result)
+                st.caption(f"Confidence: {confidence:.1f}%")
             except Exception as e:
                 st.error(f"Translation error: {e}")
