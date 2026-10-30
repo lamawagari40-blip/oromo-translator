@@ -1,21 +1,20 @@
-
 import streamlit as st
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pickle
+import re
 from huggingface_hub import hf_hub_download
 
 st.set_page_config(page_title="Saiko", page_icon="🌳", layout="centered")
 
-st.markdown('''
+st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .stApp { background-color: #0E1117 !important; }
     .block-container { padding-top: 2rem !important; }
-    
     .title-text {
         font-size: 3.5rem !important;
         font-weight: 900 !important;
@@ -54,7 +53,7 @@ st.markdown('''
         box-shadow: 0px 6px 20px rgba(255, 204, 0, 0.4);
     }
     </style>
-''', unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 st.markdown('<h1 class="title-text">🌳 Saiko</h1>', unsafe_allow_html=True)
 st.markdown('<p class="welcome-text">Baga Nagaan Dhuftan!</p>', unsafe_allow_html=True)
@@ -107,7 +106,7 @@ class Decoder(nn.Module):
         input = input.unsqueeze(1)
         embedded = self.dropout(self.embedding(input))
         a = self.attention(hidden[-1], encoder_outputs).unsqueeze(1)
-        weighted = torch.bmm(a, encoder_outputs) 
+        weighted = torch.bmm(a, encoder_outputs)
         rnn_input = torch.cat((weighted, embedded), dim=2)
         output, (hidden, cell) = self.rnn(rnn_input, (hidden, cell))
         prediction = self.fc_out(torch.cat((output.squeeze(1), weighted.squeeze(1), embedded.squeeze(1)), dim=1))
@@ -124,16 +123,13 @@ class Seq2Seq(nn.Module):
 def load_model():
     vocab_path = hf_hub_download(repo_id="lwagari/saiko-lstm-model", filename="vocab_trilingual.pkl")
     model_path = hf_hub_download(repo_id="lwagari/saiko-lstm-model", filename="lstm_trilingual.pt")
-
     with open(vocab_path, "rb") as f:
         vocab = pickle.load(f)
-    
     INPUT_DIM = OUTPUT_DIM = len(vocab.word2id)
     attn = Attention(256, 256)
     enc = Encoder(INPUT_DIM, 256, 256, 256, 0.1)
     dec = Decoder(OUTPUT_DIM, 256, 256, 256, 0.1, attn)
     model = Seq2Seq(enc, dec, device).to(device)
-    
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
     return model, vocab
@@ -142,50 +138,47 @@ def translate(model, vocab, sentence, tgt_lang="am"):
     reversed_words = list(reversed(sentence.split()))
     src_text = f"<2{tgt_lang}> " + " ".join(reversed_words)
     src_tensor = torch.tensor(vocab.encode(src_text)).unsqueeze(0).to(device)
-    
     with torch.no_grad():
         encoder_outputs, hidden = model.encoder(src_tensor)
         hidden = hidden.unsqueeze(0).repeat(2, 1, 1)
         cell = torch.zeros_like(hidden).to(device)
-        
         trg_indexes = [vocab.word2id["<sos>"]]
         probs = []
         for i in range(20):
             trg_tensor = torch.tensor([trg_indexes[-1]]).to(device)
             output, hidden, cell = model.decoder(trg_tensor, hidden, cell, encoder_outputs)
-            
             for prev_word in set(trg_indexes):
                 output[0, prev_word] -= 2.0
-            
             prob_dist = F.softmax(output, dim=1)
             pred_token = output.argmax(1).item()
             probs.append(prob_dist[0, pred_token].item())
             trg_indexes.append(pred_token)
-            
             if pred_token == vocab.word2id["<eos>"] and i > 3:
                 break
-    
     words = []
     for i in trg_indexes[1:]:
-        if i == vocab.word2id["<eos>"]: break
-        if i in [vocab.word2id["<sos>"], vocab.word2id["<pad>"]]: continue
+        if i == vocab.word2id["<eos>"]:
+            break
+        if i in [vocab.word2id["<sos>"], vocab.word2id["<pad>"]]:
+            continue
         word = vocab.id2word.get(i, "")
-        if word in ["<2am>", "<2om>", "<2en>", "<unk>"]: continue
+        if word in ["<2am>", "<2om>", "<2en>", "<unk>"]:
+            continue
         words.append(word)
-    
-    # Calculate confidence FIRST so it's always available
     confidence = (sum(probs) / len(probs) * 100) if probs else 0.0
-    
-    # Stop-word garbage filter
     stop_words = ["and", "the", "a", "of", "to", "in", "is", "that"]
     is_garbage = len(words) < 5 and all(w.lower() in stop_words or w in [",", "."] for w in words)
-    
     if is_garbage:
         return "[Model is still training: Please try again later]", confidence
-    
     result = " ".join(words)
     result = re.sub(r"\s+([,.!?])", r"\1", result)
     return result, confidence
+
+try:
+    model, vocab = load_model()
+except Exception as e:
+    st.error(f"Model loading failed. Error: {e}")
+    model, vocab = None, None
 
 LANG_NAME = {"om": "Afaan Oromoo", "am": "አማርኛ", "en": "English"}
 
@@ -202,6 +195,8 @@ if st.button("Translate 🚀"):
         st.warning("Please enter some text to translate.")
     elif src == tgt:
         st.info("Source and target languages are the same.")
+    elif model is None:
+        st.error("Model failed to load. Please reboot the app.")
     else:
         with st.spinner("Saiko is translating..."):
             try:
