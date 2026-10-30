@@ -1,0 +1,123 @@
+"""Train om↔am on pivot data (30k sample, 3 epochs)."""
+import argparse
+import random
+import torch
+from pathlib import Path
+from torch.utils.data import Dataset
+from transformers import (
+    AutoTokenizer, AutoModelForSeq2SeqLM,
+    Seq2SeqTrainer, Seq2SeqTrainingArguments, DataCollatorForSeq2Seq,
+)
+
+SPLIT_DIR = Path("artifacts/data/splits/om_am_pivot")
+SAMPLE_DIR = Path("artifacts/data/splits_om_am_pivot_sample")
+CKPT_DIR = Path("artifacts/checkpoints")
+MODEL_DIR = Path("artifacts/models")
+MODEL_NAME = "facebook/nllb-200-distilled-600M"
+LANG_CODE = {"om": "gaz_Latn", "am": "amh_Ethi"}
+
+
+class ParallelDataset(Dataset):
+    def __init__(self, pair_dir, split, tokenizer, src_lang, tgt_lang, max_len=128):
+        self.tok = tokenizer
+        self.src_lang = src_lang
+        self.tgt_lang = tgt_lang
+        self.max_len = max_len
+        with open(Path(pair_dir) / f"{split}.{src_lang}", encoding="utf-8") as f:
+            self.src = [line.strip() for line in f]
+        with open(Path(pair_dir) / f"{split}.{tgt_lang}", encoding="utf-8") as f:
+            self.tgt = [line.strip() for line in f]
+
+    def __len__(self):
+        return len(self.src)
+
+    def __getitem__(self, idx):
+        self.tok.src_lang = LANG_CODE[self.src_lang]
+        enc = self.tok(self.src[idx], max_length=self.max_len,
+                       truncation=True, padding="max_length")
+        self.tok.tgt_lang = LANG_CODE[self.tgt_lang]
+        labels = self.tok(text_target=self.tgt[idx], max_length=self.max_len,
+                          truncation=True, padding="max_length")
+        enc["labels"] = labels["input_ids"]
+        return enc
+
+
+def sample_data(src_file, tgt_file, out_dir, n):
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with open(src_file, encoding="utf-8") as f:
+        src = [l.strip() for l in f]
+    with open(tgt_file, encoding="utf-8") as f:
+        tgt = [l.strip() for l in f]
+    pairs = list(zip(src, tgt))
+    random.seed(42)
+    random.shuffle(pairs)
+    sample = pairs[:n]
+    with open(out_dir / src_file.name, "w", encoding="utf-8") as f:
+        for s, _ in sample: f.write(s + "\n")
+    with open(out_dir / tgt_file.name, "w", encoding="utf-8") as f:
+        for _, t in sample: f.write(t + "\n")
+    print(f"Sampled {len(sample)} -> {out_dir}")
+
+
+def prepare_samples(n_train=30000, n_val=2000):
+    src_dir = SPLIT_DIR
+    out_dir = SAMPLE_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    print("Sampling data...")
+    sample_data(src_dir / "train.om", src_dir / "train.am", out_dir, n_train)
+    sample_data(src_dir / "val.om", src_dir / "val.am", out_dir, n_val)
+
+
+def train(direction, epochs, batch_size, lr):
+    src_lang, tgt_lang = direction.split("_to_")
+    prepare_samples()
+
+    print(f"\n{'='*60}\nTraining: {direction}\n{'='*60}")
+    tok = AutoTokenizer.from_pretrained(MODEL_NAME)
+    model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
+
+    train_ds = ParallelDataset(SAMPLE_DIR, "train", tok, src_lang, tgt_lang)
+    val_ds = ParallelDataset(SAMPLE_DIR, "val", tok, src_lang, tgt_lang)
+    print(f"Train: {len(train_ds)}, Val: {len(val_ds)}")
+
+    out_dir = CKPT_DIR / f"{direction}_pivot"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    args = Seq2SeqTrainingArguments(
+        output_dir=str(out_dir),
+        num_train_epochs=epochs,
+        per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=batch_size,
+        learning_rate=lr,
+        warmup_steps=500,
+        save_steps=2000,
+        logging_steps=200,
+        save_total_limit=1,
+        predict_with_generate=True,
+        fp16=torch.cuda.is_available(),
+        report_to="none",
+    )
+    trainer = Seq2SeqTrainer(
+        model=model, args=args,
+        train_dataset=train_ds, eval_dataset=val_ds,
+        data_collator=DataCollatorForSeq2Seq(tok, model=model),
+    )
+    print("Starting training...")
+    trainer.train()
+
+    final = MODEL_DIR / direction
+    final.mkdir(parents=True, exist_ok=True)
+    model.save_pretrained(final)
+    tok.save_pretrained(final)
+    print(f"✅ Saved: {final}")
+
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser()
+    p.add_argument("--direction", required=True)
+    p.add_argument("--epochs", type=int, default=3)
+    p.add_argument("--batch_size", type=int, default=8)
+    p.add_argument("--lr", type=float, default=3e-5)
+    a = p.parse_args()
+    train(a.direction, a.epochs, a.batch_size, a.lr)
