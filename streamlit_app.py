@@ -141,7 +141,6 @@ def load_model():
 def translate(model, vocab, sentence, tgt_lang="am"):
     reversed_words = list(reversed(sentence.split()))
     src_text = f"<2{tgt_lang}> " + " ".join(reversed_words)
-    
     src_tensor = torch.tensor(vocab.encode(src_text)).unsqueeze(0).to(device)
     
     with torch.no_grad():
@@ -165,32 +164,28 @@ def translate(model, vocab, sentence, tgt_lang="am"):
             
             if pred_token == vocab.word2id["<eos>"] and i > 3:
                 break
-                
+    
     words = []
     for i in trg_indexes[1:]:
         if i == vocab.word2id["<eos>"]: break
         if i in [vocab.word2id["<sos>"], vocab.word2id["<pad>"]]: continue
-        
         word = vocab.id2word.get(i, "")
         if word in ["<2am>", "<2om>", "<2en>", "<unk>"]: continue
         words.append(word)
-        
-    result = " ".join(words)
     
-    # If the output is just English stop words, return a fallback message
+    # Calculate confidence FIRST so it's always available
+    confidence = (sum(probs) / len(probs) * 100) if probs else 0.0
+    
+    # Stop-word garbage filter
     stop_words = ["and", "the", "a", "of", "to", "in", "is", "that"]
-    if all(w.lower() in stop_words or w in [",", "."] for w in words) and len(words) < 5:
-        return "[Model is still training: Please try again later]", 0.0
-        
-    # Clean up spacing around punctuation
-    import re
-    result = re.sub(r'\s+([,.!?])', r'\1', result)
+    is_garbage = len(words) < 5 and all(w.lower() in stop_words or w in [",", "."] for w in words)
+    
+    if is_garbage:
+        return "[Model is still training: Please try again later]", confidence
+    
+    result = " ".join(words)
+    result = re.sub(r"\s+([,.!?])", r"\1", result)
     return result, confidence
-
-try:
-    model, vocab = load_model()
-except Exception as e:
-    st.error(f"Model loading failed. Error: {e}")
 
 LANG_NAME = {"om": "Afaan Oromoo", "am": "አማርኛ", "en": "English"}
 
