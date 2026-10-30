@@ -159,7 +159,8 @@ def translate(model, vocab, sentence, tgt_lang="am"):
                 
             pred_token = output.argmax(1).item()
             trg_indexes.append(pred_token)
-            if pred_token == vocab.word2id["<eos>"]:
+            
+            if pred_token == vocab.word2id["<eos>"] and i > 3:
                 break
                 
     words = []
