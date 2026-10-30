@@ -138,38 +138,56 @@ def translate(model, vocab, sentence, tgt_lang="am"):
     reversed_words = list(reversed(sentence.split()))
     src_text = f"<2{tgt_lang}> " + " ".join(reversed_words)
     src_tensor = torch.tensor(vocab.encode(src_text)).unsqueeze(0).to(device)
+    
     with torch.no_grad():
         encoder_outputs, hidden = model.encoder(src_tensor)
         hidden = hidden.unsqueeze(0).repeat(2, 1, 1)
         cell = torch.zeros_like(hidden).to(device)
+        
         trg_indexes = [vocab.word2id["<sos>"]]
         probs = []
+        
+        # List of English stop words to ban at the start
+        banned_words = ["and", "the", "a", "of", "to", "in", "is", "that", "for", "on", "with", ",", "."]
+        banned_ids = [vocab.word2id[w] for w in banned_words if w in vocab.word2id]
+        
         for i in range(20):
             trg_tensor = torch.tensor([trg_indexes[-1]]).to(device)
             output, hidden, cell = model.decoder(trg_tensor, hidden, cell, encoder_outputs)
+            
+            # Strong repetition penalty
             for prev_word in set(trg_indexes):
-                output[0, prev_word] -= 2.0
+                output[0, prev_word] -= 5.0
+            
+            # HARD BAN: Do not allow stop words for the first 3 words
+            if i < 3:
+                for banned_id in banned_ids:
+                    output[0, banned_id] = -99999.0
+                
             prob_dist = F.softmax(output, dim=1)
             pred_token = output.argmax(1).item()
             probs.append(prob_dist[0, pred_token].item())
             trg_indexes.append(pred_token)
+            
             if pred_token == vocab.word2id["<eos>"] and i > 3:
                 break
+                
     words = []
     for i in trg_indexes[1:]:
-        if i == vocab.word2id["<eos>"]:
-            break
-        if i in [vocab.word2id["<sos>"], vocab.word2id["<pad>"]]:
-            continue
+        if i == vocab.word2id["<eos>"]: break
+        if i in [vocab.word2id["<sos>"], vocab.word2id["<pad>"]]: continue
         word = vocab.id2word.get(i, "")
-        if word in ["<2am>", "<2om>", "<2en>", "<unk>"]:
-            continue
+        if word in ["<2am>", "<2om>", "<2en>", "<unk>"]: continue
         words.append(word)
+    
     confidence = (sum(probs) / len(probs) * 100) if probs else 0.0
+    
     stop_words = ["and", "the", "a", "of", "to", "in", "is", "that"]
     is_garbage = len(words) < 5 and all(w.lower() in stop_words or w in [",", "."] for w in words)
+    
     if is_garbage:
         return "[Model is still training: Please try again later]", confidence
+    
     result = " ".join(words)
     result = re.sub(r"\s+([,.!?])", r"\1", result)
     return result, confidence
