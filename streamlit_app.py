@@ -138,7 +138,7 @@ def load_model():
 @st.cache_resource(show_spinner="Loading 1M Phrase Database (May take a moment)...")
 def load_hybrid_dict():
     try:
-        dict_path = hf_hub_download(repo_id="lwagari/saiko-lstm-model", filename="hybrid_dict_1M.json")
+        dict_path = hf_hub_download(repo_id="lwagari/saiko-lstm-model", filename="hybrid_dict_massive.json")
         with open(dict_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
@@ -148,14 +148,20 @@ def translate(model, vocab, sentence, src_lang, tgt_lang):
     # 1. HYBRID DICTIONARY LOOKUP (INSTANT & 100% ACCURATE)
     HYBRID_DB = load_hybrid_dict()
     
-    # Normalize: lowercase, remove punctuation, and remove English articles (a, an, the)
+    # Normalize input
     clean_input = sentence.lower().strip()
     clean_input = re.sub(r"[^\w\s]", "", clean_input)
-    clean_input = re.sub(r"\b(a|an|the)\b ", "", clean_input) # Remove articles!
     
+    # Try 1: Exact match
     lookup_key = f"{src_lang}|{tgt_lang}|{clean_input}"
     if lookup_key in HYBRID_DB:
         return HYBRID_DB[lookup_key], 100.0
+        
+    # Try 2: Without articles (a, an, the)
+    clean_no_art = re.sub(r"\b(a|an|the)\b ", "", clean_input)
+    lookup_key_no_art = f"{src_lang}|{tgt_lang}|{clean_no_art}"
+    if lookup_key_no_art in HYBRID_DB:
+        return HYBRID_DB[lookup_key_no_art], 100.0
         
     # 2. NEURAL NETWORK FALLBACK
     reversed_words = list(reversed(sentence.split()))
