@@ -135,45 +135,85 @@ def load_model():
     return model, vocab
 
 
-GREETINGS_DB = {
-    # Oromo to Amharic
+
+HYBRID_DB = {
+    # --- GREETINGS & BASICS ---
     ("om", "am", "akkam bultan"): "እንዴት ነው?",
     ("om", "am", "akkam bulte"): "እንዴት ነሽ?",
     ("om", "am", "akkam nagumaa"): "እንዴት ነዎት?",
-    ("om", "am", "akkam nagaa"): "እንዴት ነዎት?",
     ("om", "am", "nagaa dha"): "ደህና ነኝ።",
     ("om", "am", "baga nagaan dhuftan"): "እንኳን ደህና መጡ።",
-    ("om", "am", "baga nagaan dhufte"): "እንኳን ደህና መጣሽ።",
     ("om", "am", "galatoomi"): "አመሰግናለሁ።",
     ("om", "am", "dhiifama"): "ይቅርታ።",
     ("om", "am", "nagaatti"): "ደህና ሁን።",
     
-    # Oromo to English
+    # --- FOOD & DRINK ---
+    ("om", "am", "bishaan naaf kenni"): "ውሃ ስጠኝ።",
+    ("om", "am", "ani beela'eera"): "እኔ ተርቤዋለሁ።",
+    ("om", "am", "ani dheebisha'eera"): "እኔ ተጠምቻለሁ።",
+    ("om", "am", "buddeena nan barbaada"): "ዳቦ እፈልጋለሁ።",
+    ("om", "am", "buna nan barbaada"): "ቡና እፈልጋለሁ።",
+    ("om", "am", "nyaanni kun baay'ee mi'aawa"): "ይህ ምግብ በጣም ጣፋጭ ነው።",
+    ("om", "am", "maallaqa naaf kenni"): "ገንዘብ ስጠኝ።",
+    
+    # --- TRAVEL & DIRECTIONS ---
+    ("om", "am", "manni fincaanii eessa jira"): "ሽንት ቤቱ የት ነው?",
+    ("om", "am", "gara gabaa akkamitti dhaqna"): "ወደ ገበያ እንዴት እንሄዳለን?",
+    ("om", "am", "kun meeqa"): "ይህ ስንት ነው?",
+    ("om", "am", "gargaarsa naaf barbaachisa"): "እርዳታ እፈልጋለሁ።",
+    ("om", "am", "bakka dhaabbata baaburaa eessa jira"): "የባቡር ጣቢያው የት ነው?",
+    ("om", "am", "as irraa fagaadhu"): "ከዚህ ራቅ።",
+    
+    # --- EMERGENCY & HEALTH ---
+    ("om", "am", "doktora naaf waami"): "ዶክተር ጥራልኝ።",
+    ("om", "am", "poolisii naaf waami"): "ፖሊስ ጥራልኝ።",
+    ("om", "am", "natti dhukkuba"): "ታመምኩኝ።",
+    ("om", "am", "na gargaari"): "እርዳኝ!",
+    
+    # --- FAMILY & PEOPLE ---
+    ("om", "am", "haati koo"): "እናቴ",
+    ("om", "am", "abbaan koo"): "አባቴ",
+    ("om", "am", "obboleettiin koo"): "እህቴ",
+    ("om", "am", "obboleessi koo"): "ወንድሜ",
+    ("om", "am", "fira koo"): "ቤተሰቤ",
+    ("om", "am", "hiriyan koo"): "ጓደኛዬ",
+
+    # --- TO ENGLISH (Oromo -> English) ---
     ("om", "en", "akkam bultan"): "How are you?",
-    ("om", "en", "akkam bulte"): "How are you? (female)",
-    ("om", "en", "akkam nagumaa"): "How are you?",
-    ("om", "en", "akkam nagaa"): "How are you?",
     ("om", "en", "nagaa dha"): "I am fine.",
     ("om", "en", "baga nagaan dhuftan"): "Welcome.",
-    ("om", "en", "baga nagaan dhufte"): "Welcome.",
     ("om", "en", "galatoomi"): "Thank you.",
-    ("om", "en", "dhiifama"): "Sorry / Excuse me.",
-    ("om", "en", "nagaatti"): "Goodbye.",
-    
-    # English to Oromo
+    ("om", "en", "bishaan naaf kenni"): "Give me water.",
+    ("om", "en", "ani beela'eera"): "I am hungry.",
+    ("om", "en", "kun meeqa"): "How much is this?",
+    ("om", "en", "gargaarsa naaf barbaachisa"): "I need help.",
+    ("om", "en", "doktora naaf waami"): "Call a doctor.",
+    ("om", "en", "na gargaari"): "Help me!",
+    ("om", "en", "haati koo"): "My mother",
+    ("om", "en", "abbaan koo"): "My father",
+    ("om", "en", "fira koo"): "My family",
+
+    # --- ENGLISH TO OROMO ---
     ("en", "om", "how are you"): "Akkam bultan?",
     ("en", "om", "i am fine"): "Nagaa dha.",
     ("en", "om", "welcome"): "Baga nagaan dhuftan.",
     ("en", "om", "thank you"): "Galatoomi.",
-    ("en", "om", "goodbye"): "Nagaatti.",
+    ("en", "om", "i am hungry"): "Ani beela'eera.",
+    ("en", "om", "i need help"): "Gargaarsa naaf barbaachisa.",
+    ("en", "om", "call a doctor"): "Doktora naaf waami.",
+    ("en", "om", "how much is this"): "Kun meeqa?",
+    ("en", "om", "where is the bathroom"): "Manni fincaanii eessa jira?",
     
-    # Amharic to Oromo
+    # --- AMHARIC TO OROMO ---
     ("am", "om", "እንዴት ነው"): "Akkam bultan?",
     ("am", "om", "ደህና ነኝ"): "Nagaa dha.",
-    ("am", "om", "እንኳን ደህና መጡ"): "Baga nagaan dhuftan.",
     ("am", "om", "አመሰግናለሁ"): "Galatoomi.",
+    ("am", "om", "ውሃ ስጠኝ"): "Bishaan naaf kenni.",
+    ("am", "om", "እርዳኝ"): "Na gargaari."
 }
 
+
+def translate
 def translate(model, vocab, sentence, tgt_lang="am"):
 
     # --- HYBRID AI: DICTIONARY LOOKUP ---
@@ -181,8 +221,8 @@ def translate(model, vocab, sentence, tgt_lang="am"):
     clean_input = re.sub(r'[^\w\s]', '', clean_input) # Remove punctuation
     
     lookup_key = (src, tgt, clean_input)
-    if lookup_key in GREETINGS_DB:
-        return GREETINGS_DB[lookup_key], 100.0
+    if lookup_key in HYBRID_DB:
+        return HYBRID_DB[lookup_key], 100.0
     # ------------------------------------
 
     reversed_words = list(reversed(sentence.split()))
