@@ -139,6 +139,19 @@ def translate(model, vocab, sentence, tgt_lang="am"):
     src_text = f"<2{tgt_lang}> " + " ".join(reversed_words)
     src_tensor = torch.tensor(vocab.encode(src_text)).unsqueeze(0).to(device)
     
+    # --- LANGUAGE MASKING (Prevent mixing Amharic & English) ---
+    banned_ids = []
+    if tgt_lang == "am":
+        # Ban tokens with Latin letters (English)
+        for wid, w in vocab.id2word.items():
+            if re.search(r"[a-zA-Z]", w):
+                banned_ids.append(wid)
+    elif tgt_lang == "en":
+        # Ban tokens with Ethiopic characters
+        for wid, w in vocab.id2word.items():
+            if re.search(r"[\u1200-\u137F]", w):
+                banned_ids.append(wid)
+    
     with torch.no_grad():
         encoder_outputs, hidden = model.encoder(src_tensor)
         hidden = hidden.unsqueeze(0).repeat(2, 1, 1)
@@ -146,24 +159,18 @@ def translate(model, vocab, sentence, tgt_lang="am"):
         
         trg_indexes = [vocab.word2id["<sos>"]]
         probs = []
-        
-        # List of English stop words to ban at the start
-        banned_words = ["and", "the", "a", "of", "to", "in", "is", "that", "for", "on", "with", ",", "."]
-        banned_ids = [vocab.word2id[w] for w in banned_words if w in vocab.word2id]
-        
         for i in range(20):
             trg_tensor = torch.tensor([trg_indexes[-1]]).to(device)
             output, hidden, cell = model.decoder(trg_tensor, hidden, cell, encoder_outputs)
             
-            # Strong repetition penalty
+            # Repetition penalty
             for prev_word in set(trg_indexes):
-                output[0, prev_word] -= 5.0
-            
-            # HARD BAN: Do not allow stop words for the first 3 words
-            if i < 3:
-                for banned_id in banned_ids:
-                    output[0, banned_id] = -99999.0
+                output[0, prev_word] -= 2.0
                 
+            # Hard ban cross-language tokens
+            for banned_id in banned_ids:
+                output[0, banned_id] = -99999.0
+            
             prob_dist = F.softmax(output, dim=1)
             pred_token = output.argmax(1).item()
             probs.append(prob_dist[0, pred_token].item())
