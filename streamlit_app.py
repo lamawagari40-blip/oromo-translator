@@ -139,15 +139,12 @@ def translate(model, vocab, sentence, tgt_lang="am"):
     src_text = f"<2{tgt_lang}> " + " ".join(reversed_words)
     src_tensor = torch.tensor(vocab.encode(src_text)).unsqueeze(0).to(device)
     
-    # --- LANGUAGE MASKING (Prevent mixing Amharic & English) ---
     banned_ids = []
     if tgt_lang == "am":
-        # Ban tokens with Latin letters (English)
         for wid, w in vocab.id2word.items():
             if re.search(r"[a-zA-Z]", w):
                 banned_ids.append(wid)
     elif tgt_lang == "en":
-        # Ban tokens with Ethiopic characters
         for wid, w in vocab.id2word.items():
             if re.search(r"[\u1200-\u137F]", w):
                 banned_ids.append(wid)
@@ -163,11 +160,9 @@ def translate(model, vocab, sentence, tgt_lang="am"):
             trg_tensor = torch.tensor([trg_indexes[-1]]).to(device)
             output, hidden, cell = model.decoder(trg_tensor, hidden, cell, encoder_outputs)
             
-            # Repetition penalty
             for prev_word in set(trg_indexes):
-                output[0, prev_word] -= 2.0
+                output[0, prev_word] -= 5.0  # INCREASED PENALTY
                 
-            # Hard ban cross-language tokens
             for banned_id in banned_ids:
                 output[0, banned_id] = -99999.0
             
@@ -188,15 +183,19 @@ def translate(model, vocab, sentence, tgt_lang="am"):
         words.append(word)
     
     confidence = (sum(probs) / len(probs) * 100) if probs else 0.0
+    result = " ".join(words)
+    result = re.sub(r"\s+([,.!?])", r"\1", result)
     
+    # PUNCTUATION LOOP DETECTOR
+    if re.search(r"([^a-zA-Z0-9\s])\1{2,}", result):
+        return "[Model is still training: Please try again later]", confidence
+
     stop_words = ["and", "the", "a", "of", "to", "in", "is", "that"]
     is_garbage = len(words) < 5 and all(w.lower() in stop_words or w in [",", "."] for w in words)
     
     if is_garbage:
         return "[Model is still training: Please try again later]", confidence
-    
-    result = " ".join(words)
-    result = re.sub(r"\s+([,.!?])", r"\1", result)
+        
     return result, confidence
 
 try:
