@@ -138,7 +138,7 @@ def load_model():
 @st.cache_resource(show_spinner="Loading 1M Phrase Database (May take a moment)...")
 def load_hybrid_dict():
     try:
-        dict_path = hf_hub_download(repo_id="lwagari/saiko-lstm-model", filename="hybrid_dict_massive.json")
+        dict_path = hf_hub_download(repo_id="lwagari/saiko-lstm-model", filename="hybrid_dict_optimized.json")
         with open(dict_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
