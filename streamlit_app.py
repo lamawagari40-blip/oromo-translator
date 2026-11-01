@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pickle
 import re
+import json
 from huggingface_hub import hf_hub_download
 
 st.set_page_config(page_title="Saiko", page_icon="🌳", layout="centered")
@@ -134,97 +135,26 @@ def load_model():
     model.eval()
     return model, vocab
 
+@st.cache_resource(show_spinner="Loading 1,853 Phrase Database...")
+def load_hybrid_dict():
+    try:
+        dict_path = hf_hub_download(repo_id="lwagari/saiko-lstm-model", filename="hybrid_dict_100k.json")
+        with open(dict_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        return {}
 
-
-HYBRID_DB = {
-    # --- GREETINGS & BASICS ---
-    ("om", "am", "akkam bultan"): "እንዴት ነው?",
-    ("om", "am", "akkam bulte"): "እንዴት ነሽ?",
-    ("om", "am", "akkam nagumaa"): "እንዴት ነዎት?",
-    ("om", "am", "nagaa dha"): "ደህና ነኝ።",
-    ("om", "am", "baga nagaan dhuftan"): "እንኳን ደህና መጡ።",
-    ("om", "am", "galatoomi"): "አመሰግናለሁ።",
-    ("om", "am", "dhiifama"): "ይቅርታ።",
-    ("om", "am", "nagaatti"): "ደህና ሁን።",
-    
-    # --- FOOD & DRINK ---
-    ("om", "am", "bishaan naaf kenni"): "ውሃ ስጠኝ።",
-    ("om", "am", "ani beela'eera"): "እኔ ተርቤዋለሁ።",
-    ("om", "am", "ani dheebisha'eera"): "እኔ ተጠምቻለሁ።",
-    ("om", "am", "buddeena nan barbaada"): "ዳቦ እፈልጋለሁ።",
-    ("om", "am", "buna nan barbaada"): "ቡና እፈልጋለሁ።",
-    ("om", "am", "nyaanni kun baay'ee mi'aawa"): "ይህ ምግብ በጣም ጣፋጭ ነው።",
-    ("om", "am", "maallaqa naaf kenni"): "ገንዘብ ስጠኝ።",
-    
-    # --- TRAVEL & DIRECTIONS ---
-    ("om", "am", "manni fincaanii eessa jira"): "ሽንት ቤቱ የት ነው?",
-    ("om", "am", "gara gabaa akkamitti dhaqna"): "ወደ ገበያ እንዴት እንሄዳለን?",
-    ("om", "am", "kun meeqa"): "ይህ ስንት ነው?",
-    ("om", "am", "gargaarsa naaf barbaachisa"): "እርዳታ እፈልጋለሁ።",
-    ("om", "am", "bakka dhaabbata baaburaa eessa jira"): "የባቡር ጣቢያው የት ነው?",
-    ("om", "am", "as irraa fagaadhu"): "ከዚህ ራቅ።",
-    
-    # --- EMERGENCY & HEALTH ---
-    ("om", "am", "doktora naaf waami"): "ዶክተር ጥራልኝ።",
-    ("om", "am", "poolisii naaf waami"): "ፖሊስ ጥራልኝ።",
-    ("om", "am", "natti dhukkuba"): "ታመምኩኝ።",
-    ("om", "am", "na gargaari"): "እርዳኝ!",
-    
-    # --- FAMILY & PEOPLE ---
-    ("om", "am", "haati koo"): "እናቴ",
-    ("om", "am", "abbaan koo"): "አባቴ",
-    ("om", "am", "obboleettiin koo"): "እህቴ",
-    ("om", "am", "obboleessi koo"): "ወንድሜ",
-    ("om", "am", "fira koo"): "ቤተሰቤ",
-    ("om", "am", "hiriyan koo"): "ጓደኛዬ",
-
-    # --- TO ENGLISH (Oromo -> English) ---
-    ("om", "en", "akkam bultan"): "How are you?",
-    ("om", "en", "nagaa dha"): "I am fine.",
-    ("om", "en", "baga nagaan dhuftan"): "Welcome.",
-    ("om", "en", "galatoomi"): "Thank you.",
-    ("om", "en", "bishaan naaf kenni"): "Give me water.",
-    ("om", "en", "ani beela'eera"): "I am hungry.",
-    ("om", "en", "kun meeqa"): "How much is this?",
-    ("om", "en", "gargaarsa naaf barbaachisa"): "I need help.",
-    ("om", "en", "doktora naaf waami"): "Call a doctor.",
-    ("om", "en", "na gargaari"): "Help me!",
-    ("om", "en", "haati koo"): "My mother",
-    ("om", "en", "abbaan koo"): "My father",
-    ("om", "en", "fira koo"): "My family",
-
-    # --- ENGLISH TO OROMO ---
-    ("en", "om", "how are you"): "Akkam bultan?",
-    ("en", "om", "i am fine"): "Nagaa dha.",
-    ("en", "om", "welcome"): "Baga nagaan dhuftan.",
-    ("en", "om", "thank you"): "Galatoomi.",
-    ("en", "om", "i am hungry"): "Ani beela'eera.",
-    ("en", "om", "i need help"): "Gargaarsa naaf barbaachisa.",
-    ("en", "om", "call a doctor"): "Doktora naaf waami.",
-    ("en", "om", "how much is this"): "Kun meeqa?",
-    ("en", "om", "where is the bathroom"): "Manni fincaanii eessa jira?",
-    
-    # --- AMHARIC TO OROMO ---
-    ("am", "om", "እንዴት ነው"): "Akkam bultan?",
-    ("am", "om", "ደህና ነኝ"): "Nagaa dha.",
-    ("am", "om", "አመሰግናለሁ"): "Galatoomi.",
-    ("am", "om", "ውሃ ስጠኝ"): "Bishaan naaf kenni.",
-    ("am", "om", "እርዳኝ"): "Na gargaari."
-}
-
-
-def translate
-def translate(model, vocab, sentence, tgt_lang="am"):
-
-    # --- HYBRID AI: DICTIONARY LOOKUP ---
+def translate(model, vocab, sentence, src_lang, tgt_lang):
+    # 1. HYBRID DICTIONARY LOOKUP (INSTANT & 100% ACCURATE)
+    HYBRID_DB = load_hybrid_dict()
     clean_input = sentence.lower().strip()
-    clean_input = re.sub(r'[^\w\s]', '', clean_input) # Remove punctuation
+    clean_input = re.sub(r"[^\w\s]", "", clean_input)
     
-    lookup_key = (src, tgt, clean_input)
+    lookup_key = f"{src_lang}|{tgt_lang}|{clean_input}"
     if lookup_key in HYBRID_DB:
         return HYBRID_DB[lookup_key], 100.0
-    # ------------------------------------
-
+        
+    # 2. NEURAL NETWORK FALLBACK
     reversed_words = list(reversed(sentence.split()))
     src_text = f"<2{tgt_lang}> " + " ".join(reversed_words)
     src_tensor = torch.tensor(vocab.encode(src_text)).unsqueeze(0).to(device)
@@ -251,7 +181,7 @@ def translate(model, vocab, sentence, tgt_lang="am"):
             output, hidden, cell = model.decoder(trg_tensor, hidden, cell, encoder_outputs)
             
             for prev_word in set(trg_indexes):
-                output[0, prev_word] -= 5.0  # INCREASED PENALTY
+                output[0, prev_word] -= 5.0 
                 
             for banned_id in banned_ids:
                 output[0, banned_id] = -99999.0
@@ -276,7 +206,6 @@ def translate(model, vocab, sentence, tgt_lang="am"):
     result = " ".join(words)
     result = re.sub(r"\s+([,.!?])", r"\1", result)
     
-    # PUNCTUATION LOOP DETECTOR
     if re.search(r"([^a-zA-Z0-9\s])\1{2,}", result):
         return "[Model is still training: Please try again later]", confidence
 
@@ -314,7 +243,7 @@ if st.button("Translate 🚀"):
     else:
         with st.spinner("Saiko is translating..."):
             try:
-                result, confidence = translate(model, vocab, text, tgt_lang=tgt)
+                result, confidence = translate(model, vocab, text, src, tgt)
                 st.success(result)
                 st.caption(f"Confidence: {confidence:.1f}%")
             except Exception as e:
