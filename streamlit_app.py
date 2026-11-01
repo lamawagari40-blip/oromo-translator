@@ -147,8 +147,11 @@ def load_hybrid_dict():
 def translate(model, vocab, sentence, src_lang, tgt_lang):
     # 1. HYBRID DICTIONARY LOOKUP (INSTANT & 100% ACCURATE)
     HYBRID_DB = load_hybrid_dict()
+    
+    # Normalize: lowercase, remove punctuation, and remove English articles (a, an, the)
     clean_input = sentence.lower().strip()
     clean_input = re.sub(r"[^\w\s]", "", clean_input)
+    clean_input = re.sub(r"\b(a|an|the)\b ", "", clean_input) # Remove articles!
     
     lookup_key = f"{src_lang}|{tgt_lang}|{clean_input}"
     if lookup_key in HYBRID_DB:
