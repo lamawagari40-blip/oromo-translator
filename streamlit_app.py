@@ -134,7 +134,57 @@ def load_model():
     model.eval()
     return model, vocab
 
+
+GREETINGS_DB = {
+    # Oromo to Amharic
+    ("om", "am", "akkam bultan"): "እንዴት ነው?",
+    ("om", "am", "akkam bulte"): "እንዴት ነሽ?",
+    ("om", "am", "akkam nagumaa"): "እንዴት ነዎት?",
+    ("om", "am", "akkam nagaa"): "እንዴት ነዎት?",
+    ("om", "am", "nagaa dha"): "ደህና ነኝ።",
+    ("om", "am", "baga nagaan dhuftan"): "እንኳን ደህና መጡ።",
+    ("om", "am", "baga nagaan dhufte"): "እንኳን ደህና መጣሽ።",
+    ("om", "am", "galatoomi"): "አመሰግናለሁ።",
+    ("om", "am", "dhiifama"): "ይቅርታ።",
+    ("om", "am", "nagaatti"): "ደህና ሁን።",
+    
+    # Oromo to English
+    ("om", "en", "akkam bultan"): "How are you?",
+    ("om", "en", "akkam bulte"): "How are you? (female)",
+    ("om", "en", "akkam nagumaa"): "How are you?",
+    ("om", "en", "akkam nagaa"): "How are you?",
+    ("om", "en", "nagaa dha"): "I am fine.",
+    ("om", "en", "baga nagaan dhuftan"): "Welcome.",
+    ("om", "en", "baga nagaan dhufte"): "Welcome.",
+    ("om", "en", "galatoomi"): "Thank you.",
+    ("om", "en", "dhiifama"): "Sorry / Excuse me.",
+    ("om", "en", "nagaatti"): "Goodbye.",
+    
+    # English to Oromo
+    ("en", "om", "how are you"): "Akkam bultan?",
+    ("en", "om", "i am fine"): "Nagaa dha.",
+    ("en", "om", "welcome"): "Baga nagaan dhuftan.",
+    ("en", "om", "thank you"): "Galatoomi.",
+    ("en", "om", "goodbye"): "Nagaatti.",
+    
+    # Amharic to Oromo
+    ("am", "om", "እንዴት ነው"): "Akkam bultan?",
+    ("am", "om", "ደህና ነኝ"): "Nagaa dha.",
+    ("am", "om", "እንኳን ደህና መጡ"): "Baga nagaan dhuftan.",
+    ("am", "om", "አመሰግናለሁ"): "Galatoomi.",
+}
+
 def translate(model, vocab, sentence, tgt_lang="am"):
+
+    # --- HYBRID AI: DICTIONARY LOOKUP ---
+    clean_input = sentence.lower().strip()
+    clean_input = re.sub(r'[^\w\s]', '', clean_input) # Remove punctuation
+    
+    lookup_key = (src, tgt, clean_input)
+    if lookup_key in GREETINGS_DB:
+        return GREETINGS_DB[lookup_key], 100.0
+    # ------------------------------------
+
     reversed_words = list(reversed(sentence.split()))
     src_text = f"<2{tgt_lang}> " + " ".join(reversed_words)
     src_tensor = torch.tensor(vocab.encode(src_text)).unsqueeze(0).to(device)
