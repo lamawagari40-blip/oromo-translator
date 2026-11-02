@@ -162,6 +162,14 @@ def translate(model, vocab, sentence, src_lang, tgt_lang):
     lookup_key_no_art = f"{src_lang}|{tgt_lang}|{clean_no_art}"
     if lookup_key_no_art in HYBRID_DB:
         return HYBRID_DB[lookup_key_no_art], 100.0
+
+    # Try 3: Fuzzy Greeting Matching (Catches spelling variations)
+    if src_lang == "om":
+        if clean_input.startswith("akkam") or "nagaa" in clean_input or "baga nagaan" in clean_input:
+            if tgt_lang == "am":
+                return "እንዴት ነው? / እንኳን ደህና መጡ።", 100.0
+            elif tgt_lang == "en":
+                return "How are you? / Welcome.", 100.0
         
     # 2. NEURAL NETWORK FALLBACK
     reversed_words = list(reversed(sentence.split()))
